@@ -1,0 +1,225 @@
+package com.example.myapplication.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
+import com.example.myapplication.ui.screens.*
+import com.example.myapplication.viewmodel.AuthViewModel
+
+@Composable
+fun AppNavigation(
+    navController: NavHostController,
+    viewModel: AuthViewModel,
+    isDarkMode: Boolean,
+    onThemeChange: (Boolean) -> Unit
+) {
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+
+    // 🔒 Observar cambios en el estado de autenticación
+    LaunchedEffect(isLoggedIn) {
+        if (!isLoggedIn) {
+            // Si el usuario no está logueado, redirigir a Login
+            navController.navigate(Screen.Login.route) {
+                // Limpiar todo el stack de navegación
+                popUpTo(0) { inclusive = true }
+                // Evitar duplicados
+                launchSingleTop = true
+            }
+        }
+    }
+
+    val startDestination = if (isLoggedIn) Screen.Home.route else Screen.Login.route
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
+        composable(Screen.Login.route) {
+            LoginScreen(
+                viewModel = viewModel,
+                onNavigateToRegister = {
+                    navController.navigate(Screen.Register.route)
+                },
+                onNavigateToForgotPassword = {
+                    navController.navigate(Screen.ForgotPassword.route)
+                },
+                onNavigateTo2FA = { email ->
+                    navController.navigate(Screen.TwoFactor.createRoute(email))
+                },
+                onNavigateToDeviceVerification = { email, password, token ->
+                    navController.navigate(
+                        Screen.DeviceVerification.createRoute(email, password, token)
+                    )
+                },
+                onLoginSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Register.route) {
+            RegisterScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onRegisterSuccess = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = Screen.TwoFactor.route,
+            arguments = listOf(navArgument("email") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            TwoFactorScreen(
+                viewModel = viewModel,
+                email = email,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onVerificationSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.ForgotPassword.route) {
+            ForgotPasswordScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = Screen.DeviceVerification.route,
+            arguments = listOf(
+                navArgument("email") { type = NavType.StringType },
+                navArgument("password") { type = NavType.StringType },
+                navArgument("token") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            val password = backStackEntry.arguments?.getString("password") ?: ""
+            val token = backStackEntry.arguments?.getString("token") ?: ""
+
+            DeviceVerificationScreen(
+                viewModel = viewModel,
+                email = email,
+                password = password,
+                verificationToken = token,
+                onVerificationSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                onCancel = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // Pantalla principal con barra de navegación inferior
+        composable(Screen.Home.route) {
+            HomeScreen(
+                viewModel = viewModel,
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onNavigateToAnalytics = {
+                    navController.navigate(Screen.AnalyticsDashboard.route)
+                },
+                onNavigateToMessageLogs = {
+                    navController.navigate(Screen.MessageLogs.route)
+                },
+                onNavigateToProducts = {
+                    navController.navigate(Screen.ProductsDashboard.route)
+                },
+                onNavigateToProfile = {
+                    navController.navigate(Screen.Profile.route)
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                }
+            )
+        }
+
+        // Perfil
+        composable(Screen.Profile.route) {
+            ProfileScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToSecurity = {
+                    // TODO: Crear pantalla de seguridad
+                },
+                onNavigateToDevices = {
+                    // TODO: Crear pantalla de dispositivos
+                },
+                onNavigateToLoginHistory = {
+                    // TODO: Crear pantalla de historial
+                },
+                onLogout = {
+                    viewModel.logout()
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // Configuración
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                isDarkMode = isDarkMode,
+                onThemeChange = onThemeChange
+            )
+        }
+
+        composable(Screen.AnalyticsDashboard.route) {
+            AnalyticsDashboardScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.MessageLogs.route) {
+            MessageLogsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.ProductsDashboard.route) {
+            ProductsDashboardScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+    }
+}
+
