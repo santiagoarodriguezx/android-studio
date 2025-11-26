@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -20,22 +21,34 @@ fun AppNavigation(
     onThemeChange: (Boolean) -> Unit
 ) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
-    val currentUser by viewModel.currentUser.collectAsState()
 
-    // 🔒 Observar cambios en el estado de autenticación
+    // 🔧 Fix: Use remember to keep startDestination stable after initial composition
+    // This prevents NavHost from resetting during logout navigation
+    val startDestination = remember { 
+        if (isLoggedIn) Screen.Home.route else Screen.Login.route 
+    }
+
+    // 🔒 Handle authentication state changes
     LaunchedEffect(isLoggedIn) {
-        if (!isLoggedIn) {
-            // Si el usuario no está logueado, redirigir a Login
-            navController.navigate(Screen.Login.route) {
-                // Limpiar todo el stack de navegación
-                popUpTo(0) { inclusive = true }
-                // Evitar duplicados
-                launchSingleTop = true
+        val currentRoute = navController.currentDestination?.route
+        
+        when {
+            // User logged out - navigate to Login
+            !isLoggedIn && currentRoute != null && currentRoute != Screen.Login.route -> {
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+            // User logged in while on Login screen - navigate to Home
+            isLoggedIn && currentRoute == Screen.Login.route -> {
+                navController.navigate(Screen.Home.route) {
+                    popUpTo(Screen.Login.route) { inclusive = true }
+                    launchSingleTop = true
+                }
             }
         }
     }
-
-    val startDestination = if (isLoggedIn) Screen.Home.route else Screen.Login.route
 
     NavHost(
         navController = navController,
@@ -178,10 +191,8 @@ fun AppNavigation(
                     // TODO: Crear pantalla de historial
                 },
                 onLogout = {
+                    // Only call logout - navigation is handled by LaunchedEffect
                     viewModel.logout()
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
                 }
             )
         }
