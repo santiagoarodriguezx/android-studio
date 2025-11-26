@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.myapplication.ui.theme.*
 import com.example.myapplication.viewmodel.AuthViewModel
-import kotlinx.coroutines.launch
 
 /**
  * Pantalla Principal - Diseño Futurista estilo iOS
@@ -47,7 +46,6 @@ fun HomeScreen(
     val currentUser by viewModel.currentUser.collectAsState()
     var showProfileDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     // Animación de entrada
     var isVisible by remember { mutableStateOf(false) }
@@ -322,11 +320,9 @@ fun HomeScreen(
                 confirmButton = {
                     Button(
                         onClick = {
-                            scope.launch {
-                                showLogoutDialog = false
-                                viewModel.logout()
-                                onLogout()
-                            }
+                            showLogoutDialog = false
+                            // Only call logout - navigation is handled by LaunchedEffect in AppNavigation
+                            viewModel.logout()
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Error
