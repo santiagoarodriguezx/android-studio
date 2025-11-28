@@ -361,4 +361,9 @@ class AuthRepository(
     suspend fun isLoggedIn(): Boolean {
         return tokenManager.getAccessToken().first() != null
     }
+
+    suspend fun clearTokens() {
+        Log.d(TAG, "🧹 Limpiando tokens...")
+        tokenManager.clearTokens()
+    }
 }

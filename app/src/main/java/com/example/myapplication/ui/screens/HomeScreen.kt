@@ -39,19 +39,31 @@ fun HomeScreen(
     onLogout: () -> Unit,
     onNavigateToAnalytics: () -> Unit = {},
     onNavigateToMessageLogs: () -> Unit = {},
+    onNavigateToScheduledMessages: () -> Unit = {},
     onNavigateToProducts: () -> Unit = {},
+    onNavigateToAgents: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {}
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
     var showProfileDialog by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
 
     // Animación de entrada
     var isVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        isVisible = true
-        viewModel.loadCurrentUser()
+
+    // ✅ Verificar estado de login y cargar datos solo si está logueado
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            isVisible = true
+            viewModel.loadCurrentUser()
+        }
+    }
+
+    // ✅ Si no está logueado, no renderizar nada (evita pantalla en blanco)
+    if (!isLoggedIn) {
+        return
     }
 
     Box(
@@ -165,7 +177,7 @@ fun HomeScreen(
                 // Acciones Rápidas
                 item {
                     Text(
-                        text = "⚡ Acciones Rápidas",
+                        text = "Acciones Rápidas",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = OnSurface,
@@ -178,6 +190,8 @@ fun HomeScreen(
                         onAnalyticsClick = onNavigateToAnalytics,
                         onProductsClick = onNavigateToProducts,
                         onMessagesClick = onNavigateToMessageLogs,
+                        onScheduledMessagesClick = onNavigateToScheduledMessages,
+                        onAgentsClick = onNavigateToAgents,
                         onSettingsClick = onNavigateToSettings
                     )
                 }
@@ -185,7 +199,7 @@ fun HomeScreen(
                 // Actividad Reciente (reemplaza "Progreso del mes")
                 item {
                     Text(
-                        text = "📊 Actividad Reciente",
+                        text = "Actividad Reciente",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = OnSurface,
@@ -607,40 +621,66 @@ private fun QuickActionsRow(
     onAnalyticsClick: () -> Unit,
     onProductsClick: () -> Unit,
     onMessagesClick: () -> Unit,
+    onScheduledMessagesClick: () -> Unit,
+    onAgentsClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        QuickActionButton(
-            icon = Icons.Outlined.Analytics,
-            label = "Analytics",
-            color = Color(0xFF667eea),
-            onClick = onAnalyticsClick,
-            modifier = Modifier.weight(1f)
-        )
-        QuickActionButton(
-            icon = Icons.Outlined.Inventory,
-            label = "Productos",
-            color = Color(0xFF4CAF50),
-            onClick = onProductsClick,
-            modifier = Modifier.weight(1f)
-        )
-        QuickActionButton(
-            icon = Icons.Outlined.Message,
-            label = "Mensajes",
-            color = Color(0xFFf093fb),
-            onClick = onMessagesClick,
-            modifier = Modifier.weight(1f)
-        )
-        QuickActionButton(
-            icon = Icons.Outlined.Settings,
-            label = "Ajustes",
-            color = Color(0xFF90CAF9),
-            onClick = onSettingsClick,
-            modifier = Modifier.weight(1f)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            QuickActionButton(
+                icon = Icons.Outlined.Analytics,
+                label = "Analytics",
+                color = Color(0xFF667eea),
+                onClick = onAnalyticsClick,
+                modifier = Modifier.weight(1f)
+            )
+            QuickActionButton(
+                icon = Icons.Outlined.Inventory,
+                label = "Productos",
+                color = Color(0xFF4CAF50),
+                onClick = onProductsClick,
+                modifier = Modifier.weight(1f)
+            )
+            QuickActionButton(
+                icon = Icons.Outlined.Message,
+                label = "Mensajes",
+                color = Color(0xFFf093fb),
+                onClick = onMessagesClick,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            QuickActionButton(
+                icon = Icons.Outlined.Schedule,
+                label = "Programados",
+                color = Color(0xFFFFA726),
+                onClick = onScheduledMessagesClick,
+                modifier = Modifier.weight(1f)
+            )
+            QuickActionButton(
+                icon = Icons.Outlined.SmartToy,
+                label = "Agentes IA",
+                color = Color(0xFF9C27B0),
+                onClick = onAgentsClick,
+                modifier = Modifier.weight(1f)
+            )
+            QuickActionButton(
+                icon = Icons.Outlined.Settings,
+                label = "Ajustes",
+                color = Color(0xFF90CAF9),
+                onClick = onSettingsClick,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 

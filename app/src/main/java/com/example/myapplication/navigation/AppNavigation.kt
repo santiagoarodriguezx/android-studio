@@ -162,8 +162,14 @@ fun AppNavigation(
                 onNavigateToMessageLogs = {
                     navController.navigate(Screen.MessageLogs.route)
                 },
+                onNavigateToScheduledMessages = {
+                    navController.navigate(Screen.ScheduledMessages.route)
+                },
                 onNavigateToProducts = {
                     navController.navigate(Screen.ProductsDashboard.route)
+                },
+                onNavigateToAgents = {
+                    navController.navigate(Screen.Agents.route)
                 },
                 onNavigateToProfile = {
                     navController.navigate(Screen.Profile.route)
@@ -226,6 +232,81 @@ fun AppNavigation(
 
         composable(Screen.ProductsDashboard.route) {
             ProductsDashboardScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // Agentes de IA
+        composable(Screen.Agents.route) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val agentsViewModel = remember {
+                com.example.myapplication.viewmodel.AgentsViewModel(context)
+            }
+
+            AgentsScreen(
+                viewModel = agentsViewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        // Mensajes Programados
+        composable(Screen.ScheduledMessages.route) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val repository = com.example.myapplication.data.repository.ScheduledMessagesRepository(context)
+            val scheduledMessagesViewModel = remember {
+                com.example.myapplication.viewmodel.ScheduledMessagesViewModel(repository)
+            }
+
+            ScheduledMessagesScreen(
+                viewModel = scheduledMessagesViewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToCreate = {
+                    navController.navigate(Screen.CreateScheduledMessage.route)
+                },
+                onNavigateToDetail = { messageId ->
+                    navController.navigate(Screen.ScheduledMessageDetail.createRoute(messageId))
+                }
+            )
+        }
+
+        composable(Screen.CreateScheduledMessage.route) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val repository = com.example.myapplication.data.repository.ScheduledMessagesRepository(context)
+            val scheduledMessagesViewModel = remember {
+                com.example.myapplication.viewmodel.ScheduledMessagesViewModel(repository)
+            }
+
+            CreateScheduledMessageScreen(
+                viewModel = scheduledMessagesViewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onSuccess = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(
+            route = Screen.ScheduledMessageDetail.route,
+            arguments = listOf(navArgument("messageId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val messageId = backStackEntry.arguments?.getString("messageId") ?: ""
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val repository = com.example.myapplication.data.repository.ScheduledMessagesRepository(context)
+            val scheduledMessagesViewModel = remember {
+                com.example.myapplication.viewmodel.ScheduledMessagesViewModel(repository)
+            }
+
+            ScheduledMessageDetailScreen(
+                messageId = messageId,
+                viewModel = scheduledMessagesViewModel,
                 onNavigateBack = {
                     navController.popBackStack()
                 }

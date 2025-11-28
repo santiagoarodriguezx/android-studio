@@ -60,9 +60,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Verificar el estado de autenticación cada vez que la app se reanuda
-        authViewModel.checkLoginStatus()
-    }
+    // ✅ Eliminado onResume() para evitar loop infinito de peticiones al backend
+    // El estado de login ya se verifica en el init{} del AuthViewModel
 }

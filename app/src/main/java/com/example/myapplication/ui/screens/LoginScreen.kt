@@ -50,10 +50,13 @@ fun LoginScreen(
     val authState by viewModel.authState.collectAsState()
     val scrollState = rememberScrollState()
 
-    // Animación de entrada
+     // Animación de entrada y limpieza de estado
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         visible = true
+        viewModel.resetAuthState()
+        // verificar si hay lgin si no redirigir
+        viewModel.checkLoginStatus()
     }
 
     // Observar estados de autenticación

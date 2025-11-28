@@ -4,14 +4,22 @@ import com.example.myapplication.data.models.*
 import com.example.myapplication.data.network.RetrofitClient
 import com.example.myapplication.data.local.TokenManager
 import android.content.Context
+import android.util.Log
+import kotlinx.coroutines.flow.first
 
 class MessageLogsRepository(private val context: Context) {
 
+    private val TAG = "MessageLogsRepository"
     private val api = RetrofitClient.messageLogsApi
     private val tokenManager = TokenManager(context)
 
-    private fun getAuthHeader(): String {
-        val token = tokenManager.getAccessToken()
+    private suspend fun getAuthHeader(): String {
+        val token = tokenManager.getAccessToken().first()
+        if (token.isNullOrEmpty()) {
+            Log.e(TAG, "❌ No hay token de acceso disponible para MessageLogs")
+            throw IllegalStateException("No hay token de acceso disponible")
+        }
+        Log.d(TAG, "✅ Token recuperado para MessageLogs: ${token.take(20)}...")
         return "Bearer $token"
     }
 

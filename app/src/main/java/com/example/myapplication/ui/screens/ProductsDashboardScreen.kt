@@ -1,7 +1,5 @@
 package com.example.myapplication.ui.screens
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -19,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +29,7 @@ import com.example.myapplication.ui.theme.*
 import com.example.myapplication.viewmodel.ProductsViewModel
 import com.example.myapplication.viewmodel.ProductsState
 import com.example.myapplication.data.models.Product
+import com.example.myapplication.data.models.ProductCreate
 import com.example.myapplication.data.models.ProductSummary
 import com.example.myapplication.data.models.Company
 import java.text.NumberFormat
@@ -82,6 +80,7 @@ fun ProductsDashboardScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
+                        @Suppress("DEPRECATION")
                         Icon(Icons.Filled.ArrowBack, "Volver")
                     }
                 },
@@ -175,16 +174,13 @@ fun ProductsDashboardScreen(
 
     // Dialogs
     if (showAddProductDialog) {
-        // TODO: Implementar dialog crear producto
-        AlertDialog(
-            onDismissRequest = { showAddProductDialog = false },
-            title = { Text("Nuevo Producto") },
-            text = { Text("Funcionalidad próximamente...") },
-            confirmButton = {
-                TextButton(onClick = { showAddProductDialog = false }) {
-                    Text("Cerrar")
-                }
-            }
+        CreateProductDialog(
+            onDismiss = { showAddProductDialog = false },
+            onCreateProduct = { productCreate ->
+                viewModel.createProduct(productCreate)
+                showAddProductDialog = false
+            },
+            categories = summary?.categories ?: emptyList()
         )
     }
 
@@ -211,7 +207,7 @@ fun ProductsDashboardScreen(
 
     // Mostrar mensajes de éxito/error
     LaunchedEffect(productsState) {
-        when (val state = productsState) {
+        when (productsState) {
             is ProductsState.Success -> {
                 // Opcional: Mostrar Snackbar
                 viewModel.resetState()
@@ -364,7 +360,6 @@ private fun ProductsContent(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SearchBar(
     query: String,
@@ -394,7 +389,8 @@ private fun SearchBar(
             unfocusedBorderColor = OnSurfaceVariant.copy(alpha = 0.3f)
         )
     )
-}
+    }
+
 
 @Composable
 private fun SummaryKPIs(summary: ProductSummary) {
@@ -604,7 +600,7 @@ private fun ProductCard(
     product: Product,
     onClick: () -> Unit,
     onStockUpdate: (String, Int) -> Unit,
-    onToggleActive: (String) -> Unit
+    @Suppress("UNUSED_PARAMETER") onToggleActive: (String) -> Unit
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.US) }
     var showStockDialog by remember { mutableStateOf(false) }
@@ -675,7 +671,7 @@ private fun ProductCard(
                 )
             }
 
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
             // Info de precio y stock
             Row(
@@ -925,6 +921,16 @@ private fun FilterDialog(
                         modifier = Modifier.weight(1f)
                     )
                 }
+
+                // Botón de limpiar filtros
+                TextButton(
+                    onClick = onClearFilters,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Outlined.Clear, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Limpiar todos los filtros")
+                }
             }
         },
         confirmButton = {
@@ -941,13 +947,8 @@ private fun FilterDialog(
             }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onClearFilters) {
-                    Text("Limpiar")
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("Cancelar")
-                }
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
             }
         }
     )
@@ -1199,4 +1200,294 @@ private fun CompanyInfoCard(company: Company) {
             }
         }
     }
+}
+
+/**
+ * Dialog para crear un nuevo producto
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CreateProductDialog(
+    onDismiss: () -> Unit,
+    onCreateProduct: (ProductCreate) -> Unit,
+    categories: List<String>
+) {
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var price by remember { mutableStateOf("") }
+    var stock by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("") }
+    var imageUrl by remember { mutableStateOf("") }
+    var active by remember { mutableStateOf(true) }
+    var showCategoryDropdown by remember { mutableStateOf(false) }
+    var isNewCategory by remember { mutableStateOf(false) }
+
+    // Validación
+    val isValid = name.isNotBlank() &&
+                  price.isNotBlank() &&
+                  price.toDoubleOrNull() != null &&
+                  price.toDouble() > 0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Filled.AddCircle,
+                    contentDescription = null,
+                    tint = Primary
+                )
+                Text("Nuevo Producto")
+            }
+        },
+        text = {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Nombre *
+                item {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nombre *") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        isError = name.isBlank(),
+                        supportingText = {
+                            if (name.isBlank()) {
+                                Text("Campo requerido", color = Error)
+                            }
+                        }
+                    )
+                }
+
+                // Descripción
+                item {
+                    OutlinedTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        label = { Text("Descripción") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 3
+                    )
+                }
+
+                // Precio *
+                item {
+                    OutlinedTextField(
+                        value = price,
+                        onValueChange = {
+                            if (it.isEmpty() || it.matches(Regex("^\\d*\\.?\\d*$"))) {
+                                price = it
+                            }
+                        },
+                        label = { Text("Precio *") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = {
+                            Icon(Icons.Outlined.AttachMoney, null)
+                        },
+                        isError = price.isNotBlank() && (price.toDoubleOrNull() == null || price.toDouble() <= 0),
+                        supportingText = {
+                            if (price.isNotBlank() && (price.toDoubleOrNull() == null || price.toDouble() <= 0)) {
+                                Text("Precio debe ser mayor a 0", color = Error)
+                            }
+                        }
+                    )
+                }
+
+                // Stock
+                item {
+                    OutlinedTextField(
+                        value = stock,
+                        onValueChange = {
+                            if (it.isEmpty() || it.matches(Regex("^\\d+$"))) {
+                                stock = it
+                            }
+                        },
+                        label = { Text("Stock inicial") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Inventory, null)
+                        },
+                        placeholder = { Text("0") }
+                    )
+                }
+
+                // Categoría
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "Categoría",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        if (categories.isNotEmpty() && !isNewCategory) {
+                            // Dropdown con categorías existentes
+                            Column {
+                                ExposedDropdownMenuBox(
+                                    expanded = showCategoryDropdown,
+                                    onExpandedChange = { showCategoryDropdown = it }
+                                ) {
+                                    OutlinedTextField(
+                                        value = category,
+                                        onValueChange = {},
+                                        readOnly = true,
+                                        label = { Text("Seleccionar categoría") },
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = showCategoryDropdown)
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+                                    )
+
+                                    ExposedDropdownMenu(
+                                        expanded = showCategoryDropdown,
+                                        onDismissRequest = { showCategoryDropdown = false }
+                                    ) {
+                                        categories.forEach { cat ->
+                                            DropdownMenuItem(
+                                                text = { Text(cat) },
+                                                onClick = {
+                                                    category = cat
+                                                    showCategoryDropdown = false
+                                                },
+                                                leadingIcon = {
+                                                    Icon(Icons.Outlined.Category, null)
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                TextButton(
+                                    onClick = {
+                                        isNewCategory = true
+                                        category = ""
+                                    }
+                                ) {
+                                    Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Nueva categoría")
+                                }
+                            }
+                        } else {
+                            // Input para nueva categoría
+                            OutlinedTextField(
+                                value = category,
+                                onValueChange = { category = it },
+                                label = { Text("Nueva categoría") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Category, null)
+                                }
+                            )
+
+                            if (categories.isNotEmpty() && isNewCategory) {
+                                TextButton(
+                                    onClick = {
+                                        isNewCategory = false
+                                        category = ""
+                                    }
+                                ) {
+                                    @Suppress("DEPRECATION")
+                                    Icon(Icons.Outlined.ArrowBack, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Seleccionar existente")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // URL de imagen
+                item {
+                    OutlinedTextField(
+                        value = imageUrl,
+                        onValueChange = { imageUrl = it },
+                        label = { Text("URL de imagen") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = {
+                            Icon(Icons.Outlined.Image, null)
+                        },
+                        placeholder = { Text("https://...") }
+                    )
+                }
+
+                // Estado activo
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                if (active) Icons.Filled.CheckCircle else Icons.Outlined.Block,
+                                null,
+                                tint = if (active) Success else OnSurfaceVariant
+                            )
+                            Column {
+                                Text(
+                                    "Producto activo",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    if (active) "Visible para clientes" else "Oculto en catálogo",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = OnSurfaceVariant
+                                )
+                            }
+                        }
+                        Switch(
+                            checked = active,
+                            onCheckedChange = { active = it }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val productCreate = ProductCreate(
+                        name = name.trim(),
+                        description = description.trim().ifBlank { null },
+                        price = price.toDouble(),
+                        stock = stock.toIntOrNull() ?: 0,
+                        category = category.trim().ifBlank { null },
+                        imageUrl = imageUrl.trim().ifBlank { null },
+                        active = active
+                    )
+                    onCreateProduct(productCreate)
+                },
+                enabled = isValid
+            ) {
+                Icon(Icons.Filled.Check, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Crear Producto")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
+    )
 }

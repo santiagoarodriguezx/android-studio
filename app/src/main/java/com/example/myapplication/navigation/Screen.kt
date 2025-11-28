@@ -17,5 +17,11 @@ sealed class Screen(val route: String) {
     object MessageLogs : Screen("message_logs")
     object AnalyticsDashboard : Screen("analytics_dashboard")
     object ProductsDashboard : Screen("products_dashboard")
+    object ScheduledMessages : Screen("scheduled_messages")
+    object CreateScheduledMessage : Screen("create_scheduled_message")
+    object ScheduledMessageDetail : Screen("scheduled_message_detail/{messageId}") {
+        fun createRoute(messageId: String) = "scheduled_message_detail/$messageId"
+    }
+    object Agents : Screen("agents")
 }
 

@@ -17,14 +17,22 @@ class AuthInterceptor(private val context: Context) : Interceptor {
     private val TAG = "AuthInterceptor"
     private val tokenManager = TokenManager(context)
 
+    // 🔒 Flag para evitar múltiples intentos de renovación simultáneos
+    private var isRefreshing = false
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
+
+        // ✅ No interceptar la petición de refresh token para evitar loop infinito
+        if (originalRequest.url.encodedPath.contains("/auth/refresh")) {
+            return chain.proceed(originalRequest)
+        }
 
         // Intentar la petición original
         var response = chain.proceed(originalRequest)
 
         // Si obtenemos 401 (Unauthorized) y el mensaje es "Token expirado"
-        if (response.code == 401) {
+        if (response.code == 401 && !isRefreshing) {
             val responseBody = response.peekBody(Long.MAX_VALUE).string()
 
             if (responseBody.contains("Token expirado", ignoreCase = true)) {
@@ -45,7 +53,11 @@ class AuthInterceptor(private val context: Context) : Interceptor {
                     Log.d(TAG, "🔄 Reintentando petición con nuevo token")
                     response = chain.proceed(newRequest)
                 } else {
-                    Log.e(TAG, "❌ No se pudo renovar el token")
+                    Log.e(TAG, "❌ No se pudo renovar el token - limpiando sesión")
+                    // ✅ Limpiar tokens para forzar re-login
+                    runBlocking {
+                        tokenManager.clearTokens()
+                    }
                 }
             }
         }
@@ -54,6 +66,13 @@ class AuthInterceptor(private val context: Context) : Interceptor {
     }
 
     private suspend fun refreshAccessToken(): String? {
+        // ✅ Evitar múltiples intentos simultáneos
+        if (isRefreshing) {
+            Log.d(TAG, "⏭️ Ya hay un refresh en progreso, saltando...")
+            return null
+        }
+
+        isRefreshing = true
         return try {
             val refreshToken = tokenManager.getRefreshToken().first()
             if (refreshToken.isNullOrEmpty()) {
@@ -96,12 +115,21 @@ class AuthInterceptor(private val context: Context) : Interceptor {
 
                 newAccessToken
             } else {
-                Log.e(TAG, "❌ Error renovando token: ${response.errorBody()?.string()}")
+                val errorBody = response.errorBody()?.string()
+                Log.e(TAG, "❌ Error renovando token: $errorBody")
+
+                // ✅ Si el refresh token también expiró, limpiar todo
+                if (response.code() == 401) {
+                    Log.e(TAG, "❌ Refresh token también expiró - limpiando sesión")
+                    tokenManager.clearTokens()
+                }
                 null
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Excepción renovando token: ${e.message}", e)
             null
+        } finally {
+            isRefreshing = false
         }
     }
 }

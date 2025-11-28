@@ -34,6 +34,9 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     private val _isLoggedIn = MutableStateFlow(false)
     val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
 
+    // 🔒 Flag para evitar múltiples llamadas simultáneas
+    private var isCheckingLoginStatus = false
+
     init {
         checkLoginStatus()
     }
@@ -43,16 +46,36 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
      * Se llama automáticamente al iniciar y puede llamarse manualmente cuando sea necesario
      */
     fun checkLoginStatus() {
-        viewModelScope.launch {
-            val hasToken = repository.isLoggedIn()
-            _isLoggedIn.value = hasToken
+        // ✅ Evitar llamadas concurrentes
+        if (isCheckingLoginStatus) {
+            Log.d(TAG, "⏭️ Ya hay una verificación de login en progreso, saltando...")
+            return
+        }
 
-            if (hasToken) {
-                loadCurrentUser()
-            } else {
-                // Si no hay token, limpiar el estado
-                _currentUser.value = null
-                _authState.value = AuthState.Idle
+        viewModelScope.launch {
+            isCheckingLoginStatus = true
+            try {
+                val hasToken = repository.isLoggedIn()
+                _isLoggedIn.value = hasToken
+
+                if (hasToken) {
+                    // ✅ Solo cargar usuario si realmente tenemos un token válido
+                    try {
+                        loadCurrentUser()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Error cargando usuario: ${e.message}")
+                        // Si falla, probablemente el token expiró
+                        _isLoggedIn.value = false
+                        _currentUser.value = null
+                        repository.clearTokens()
+                    }
+                } else {
+                    // Si no hay token, limpiar el estado
+                    _currentUser.value = null
+                    _authState.value = AuthState.Idle
+                }
+            } finally {
+                isCheckingLoginStatus = false
             }
         }
     }
@@ -205,22 +228,48 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
 
     fun logout() {
         viewModelScope.launch {
-            repository.logout()
+            // ✅ Verificar si hay tokens antes de intentar logout
+            val hasTokens = repository.isLoggedIn()
+
+            if (hasTokens) {
+                // Si hay tokens, hacer logout en el servidor
+                repository.logout()
+            } else {
+                // Si no hay tokens, solo limpiar el estado local
+                Log.d(TAG, "⚠️ No hay tokens - solo limpiando estado local")
+            }
+
+            // ✅ SIEMPRE limpiar el estado local sin importar el resultado
             _isLoggedIn.value = false
             _currentUser.value = null
-            _authState.value = AuthState.Success("Sesión cerrada")
+            _authState.value = AuthState.Idle
+
+            Log.d(TAG, "🚪 Logout completado - isLoggedIn: ${_isLoggedIn.value}")
         }
     }
 
     fun loadCurrentUser() {
         viewModelScope.launch {
-            val result = repository.getCurrentUser()
+            try {
+                val result = repository.getCurrentUser()
 
-            result.onSuccess { user ->
-                _currentUser.value = user
-                _isLoggedIn.value = true
-            }.onFailure {
+                result.onSuccess { user ->
+                    _currentUser.value = user
+                    _isLoggedIn.value = true
+                    Log.d(TAG, "✅ Usuario cargado: ${user.email}")
+                }.onFailure { error ->
+                    Log.e(TAG, "❌ Error obteniendo usuario actual: ${error.message}")
+                    // ✅ Si falla (token expirado, etc.), limpiar sesión
+                    _isLoggedIn.value = false
+                    _currentUser.value = null
+                    // Limpiar tokens para evitar intentos repetidos
+                    repository.clearTokens()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Excepción cargando usuario: ${e.message}")
                 _isLoggedIn.value = false
+                _currentUser.value = null
+                repository.clearTokens()
             }
         }
     }
